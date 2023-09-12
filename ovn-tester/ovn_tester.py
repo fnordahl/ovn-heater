@@ -10,10 +10,8 @@ import gc
 import time
 
 from collections import namedtuple
-from ovn_context import Context
 from ovn_sandbox import PhysicalNode
-from ovn_workload import BrExConfig, ClusterConfig
-from ovn_workload import CentralNode, WorkerNode, Cluster
+from ovn_workload import BrExConfig, CentralNode, ClusterConfig
 from ovn_utils import DualStackSubnet
 from ovs.stream import Stream
 
@@ -21,8 +19,6 @@ from ovs.stream import Stream
 GlobalCfg = namedtuple(
     "GlobalCfg", ["log_cmds", "cleanup", "run_ipv4", "run_ipv6"]
 )
-
-ClusterBringupCfg = namedtuple("ClusterBringupCfg", ["n_pods_per_node"])
 
 
 def usage(name):
@@ -125,11 +121,14 @@ def read_config(config):
         physical_net=cluster_args.get("physical_net", "providernet"),
     )
 
-    bringup_args = config.get("base_cluster_bringup", dict())
-    bringup_cfg = ClusterBringupCfg(
-        n_pods_per_node=bringup_args.get("n_pods_per_node", 10)
-    )
-    return global_cfg, cluster_cfg, brex_cfg, bringup_cfg
+    # Apart from the 'name' attribute, which is mandatory to load the CMS
+    # plugin, we do not attempt to parse CMS specific configuration.
+    cms_args = config.get("cms", dict())
+    if "name" not in cms_args:
+        raise ovn_exceptions.OvnInvalidConfigException()
+    cms_args["name"] = cms_args["name"].replace("-", "_")
+
+    return global_cfg, cluster_cfg, brex_cfg, cms_args
 
 
 def setup_logging(global_cfg):
@@ -164,9 +163,17 @@ def setup_logging(global_cfg):
 RESERVED = [
     "global",
     "cluster",
-    "base_cluster_bringup",
+    "cms",
     "ext_cmd",
 ]
+
+
+def load_cms(cms_args):
+    cms_name = cms_args["name"]
+    mod = importlib.import_module(f"cms.{cms_name}")
+    class_name = cms_name.replace("-", "_")
+    cls = getattr(mod, class_name)
+    return cls(cms_args)
 
 
 def configure_tests(yaml, central_node, worker_nodes, global_cfg):
@@ -182,12 +189,9 @@ def configure_tests(yaml, central_node, worker_nodes, global_cfg):
     return tests
 
 
-def create_nodes(cluster_config, central, workers):
+def create_central_nodes(cluster_config, central):
     mgmt_net = cluster_config.node_net
     mgmt_ip = mgmt_net.ip + 2
-    internal_net = cluster_config.internal_net
-    external_net = cluster_config.external_net
-    gw_net = cluster_config.gw_net
     db_containers = (
         ["ovn-central-1", "ovn-central-2", "ovn-central-3"]
         if cluster_config.clustered_db
@@ -199,50 +203,13 @@ def create_nodes(cluster_config, central, workers):
     central_node = CentralNode(
         central, db_containers, relay_containers, mgmt_net, mgmt_ip
     )
-    worker_nodes = [
-        WorkerNode(
-            workers[i % len(workers)],
-            f"ovn-scale-{i}",
-            mgmt_net,
-            mgmt_ip + i,
-            DualStackSubnet.next(internal_net, i),
-            DualStackSubnet.next(external_net, i),
-            gw_net,
-            i,
-        )
-        for i in range(cluster_config.n_workers)
-    ]
-    return central_node, worker_nodes
+    return central_node
 
 
 def set_ssl_keys(cluster_cfg):
     Stream.ssl_set_private_key_file(cluster_cfg.ssl_private_key)
     Stream.ssl_set_certificate_file(cluster_cfg.ssl_cert)
     Stream.ssl_set_ca_cert_file(cluster_cfg.ssl_cacert)
-
-
-def prepare_test(central_node, worker_nodes, cluster_cfg, brex_cfg):
-    if cluster_cfg.enable_ssl:
-        set_ssl_keys(cluster_cfg)
-    ovn = Cluster(central_node, worker_nodes, cluster_cfg, brex_cfg)
-    with Context(ovn, "prepare_test"):
-        ovn.start()
-    return ovn
-
-
-def run_base_cluster_bringup(ovn, bringup_cfg, global_cfg):
-    # create ovn topology
-    with Context(ovn, "base_cluster_bringup", len(ovn.worker_nodes)) as ctx:
-        ovn.create_cluster_router("lr-cluster")
-        ovn.create_cluster_join_switch("ls-join")
-        ovn.create_cluster_load_balancer("lb-cluster", global_cfg)
-        for i in ctx:
-            worker = ovn.worker_nodes[i]
-            worker.provision(ovn)
-            ports = worker.provision_ports(ovn, bringup_cfg.n_pods_per_node)
-            worker.provision_load_balancers(ovn, ports, global_cfg)
-            worker.ping_ports(ovn, ports)
-        ovn.provision_lb_group()
 
 
 if __name__ == "__main__":
@@ -253,19 +220,25 @@ if __name__ == "__main__":
     with open(sys.argv[2], "r") as yaml_file:
         config = yaml.safe_load(yaml_file)
 
-    global_cfg, cluster_cfg, brex_cfg, bringup_cfg = read_config(config)
+    global_cfg, cluster_cfg, brex_cfg, cms_args = read_config(config)
 
     setup_logging(global_cfg)
 
     if not global_cfg.run_ipv4 and not global_cfg.run_ipv6:
         raise ovn_exceptions.OvnInvalidConfigException()
 
+    cms = load_cms(cms_args)
+
     central, workers = read_physical_deployment(sys.argv[1], global_cfg)
-    central_node, worker_nodes = create_nodes(cluster_cfg, central, workers)
+    central_node = create_central_nodes(cluster_cfg, central)
+    worker_nodes = cms.create_nodes(cluster_cfg, workers)
     tests = configure_tests(config, central_node, worker_nodes, global_cfg)
 
-    ovn = prepare_test(central_node, worker_nodes, cluster_cfg, brex_cfg)
-    run_base_cluster_bringup(ovn, bringup_cfg, global_cfg)
+    if cluster_cfg.enable_ssl:
+        set_ssl_keys(cluster_cfg)
+
+    ovn = cms.prepare_test(central_node, worker_nodes, cluster_cfg, brex_cfg)
+    cms.run_base_cluster_bringup(ovn, global_cfg)
     for test in tests:
         test.run(ovn, global_cfg)
     sys.exit(0)
