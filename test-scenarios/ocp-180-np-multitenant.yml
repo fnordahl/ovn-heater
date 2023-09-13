@@ -6,8 +6,10 @@ cluster:
   monitor_all: true
   n_workers: 180
 
-base_cluster_bringup:
-  n_pods_per_node: 10
+cms:
+  name: ovn-kubernetes
+  base_cluster_bringup:
+    n_pods_per_node: 10
 
 netpol_multitenant:
   n_namespaces: 500

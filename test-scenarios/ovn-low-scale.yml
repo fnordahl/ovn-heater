@@ -40,8 +40,10 @@ ext_cmd:
     pid_name: "perf"
     test: "density_light"
 
-base_cluster_bringup:
-  n_pods_per_node: 2
+cms:
+  name: ovn-kubernetes
+  base_cluster_bringup:
+    n_pods_per_node: 2
 
 density_light:
   n_pods: 10

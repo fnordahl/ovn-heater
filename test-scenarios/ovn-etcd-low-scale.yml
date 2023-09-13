@@ -8,8 +8,10 @@ cluster:
   use_ovsdb_etcd: true
   n_workers: 2
 
-base_cluster_bringup:
-  n_pods_per_node: 2
+cms:
+  name: ovn-kubernetes
+  base_cluster_bringup:
+    n_pods_per_node: 2
 
 density_light:
   n_pods: 10

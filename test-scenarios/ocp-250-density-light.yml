@@ -6,8 +6,10 @@ cluster:
   monitor_all: true
   n_workers: 250
 
-base_cluster_bringup:
-  n_pods_per_node: 10
+cms:
+  name: ovn-kubernetes
+  base_cluster_bringup:
+    n_pods_per_node: 10
 
 density_light:
   n_startup: 60000

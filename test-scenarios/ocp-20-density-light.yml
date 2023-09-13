@@ -1,13 +1,16 @@
 global:
   log_cmds: False
 
+cms:
+  name: ovn-kubernetes
+  base_cluster_bringup:
+    n_pods_per_node: 10
+
 cluster:
   clustered_db: true
   monitor_all: true
   n_workers: 20
 
-base_cluster_bringup:
-  n_pods_per_node: 10
 
 density_light:
   n_startup: 4000
