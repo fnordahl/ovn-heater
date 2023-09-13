@@ -176,13 +176,13 @@ def load_cms(cms_args):
     return cls(cms_args)
 
 
-def configure_tests(yaml, central_node, worker_nodes, global_cfg):
+def configure_tests(yaml, central_node, worker_nodes, global_cfg, cms_name):
     tests = []
     for section, cfg in yaml.items():
         if section in RESERVED:
             continue
 
-        mod = importlib.import_module(f"tests.{section}")
+        mod = importlib.import_module(f"cms.{cms_name}.tests.{section}")
         class_name = "".join(s.title() for s in section.split("_"))
         cls = getattr(mod, class_name)
         tests.append(cls(yaml, central_node, worker_nodes, global_cfg))
@@ -232,7 +232,9 @@ if __name__ == "__main__":
     central, workers = read_physical_deployment(sys.argv[1], global_cfg)
     central_node = create_central_nodes(cluster_cfg, central)
     worker_nodes = cms.create_nodes(cluster_cfg, workers)
-    tests = configure_tests(config, central_node, worker_nodes, global_cfg)
+    tests = configure_tests(
+        config, central_node, worker_nodes, global_cfg, cms_args["name"]
+    )
 
     if cluster_cfg.enable_ssl:
         set_ssl_keys(cluster_cfg)
