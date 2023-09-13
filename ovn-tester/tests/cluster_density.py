@@ -13,7 +13,7 @@ DENSITY_N_TOT_PODS = DENSITY_N_BUILD_PODS + DENSITY_N_PODS
 # can be used as backends.
 assert DENSITY_N_PODS >= 4
 
-ClusterDensityCfg = namedtuple('ClusterDensityCfg', ['n_runs', 'n_startup'])
+ClusterDensityCfg = namedtuple("ClusterDensityCfg", ["n_runs", "n_startup"])
 
 
 class ClusterDensity(ExtCmd):
@@ -21,16 +21,16 @@ class ClusterDensity(ExtCmd):
         super(ClusterDensity, self).__init__(
             config, central_node, worker_nodes
         )
-        test_config = config.get('cluster_density', dict())
+        test_config = config.get("cluster_density", dict())
         self.config = ClusterDensityCfg(
-            n_runs=test_config.get('n_runs', 0),
-            n_startup=test_config.get('n_startup', 0),
+            n_runs=test_config.get("n_runs", 0),
+            n_startup=test_config.get("n_startup", 0),
         )
         if self.config.n_startup > self.config.n_runs:
             raise ovn_exceptions.OvnInvalidConfigException()
 
     def run_iteration(self, ovn, index, global_cfg, passive):
-        ns = Namespace(ovn, f'NS_density_{index}', global_cfg)
+        ns = Namespace(ovn, f"NS_density_{index}", global_cfg)
         # Create DENSITY_N_BUILD_PODS short lived "build" pods.
         if not passive:
             build_ports = ovn.provision_ports(DENSITY_N_BUILD_PODS, passive)
@@ -60,7 +60,7 @@ class ClusterDensity(ExtCmd):
 
     def run(self, ovn, global_cfg):
         all_ns = []
-        with Context(ovn, 'cluster_density_startup', brief_report=True) as ctx:
+        with Context(ovn, "cluster_density_startup", brief_report=True) as ctx:
             for index in range(self.config.n_startup):
                 all_ns.append(
                     self.run_iteration(ovn, index, global_cfg, passive=True)
@@ -68,7 +68,7 @@ class ClusterDensity(ExtCmd):
 
         with Context(
             ovn,
-            'cluster_density',
+            "cluster_density",
             self.config.n_runs - self.config.n_startup,
             test=self,
         ) as ctx:
@@ -80,6 +80,6 @@ class ClusterDensity(ExtCmd):
 
         if not global_cfg.cleanup:
             return
-        with Context(ovn, 'cluster_density_cleanup', brief_report=True) as ctx:
+        with Context(ovn, "cluster_density_cleanup", brief_report=True) as ctx:
             for ns in all_ns:
                 ns.unprovision()

@@ -4,7 +4,7 @@ from ovn_workload import Namespace
 from ovn_ext_cmd import ExtCmd
 import ovn_exceptions
 
-NpCfg = namedtuple('NpCfg', ['n_ns', 'n_labels', 'pods_ns_ratio'])
+NpCfg = namedtuple("NpCfg", ["n_ns", "n_labels", "pods_ns_ratio"])
 
 
 class NetPol(ExtCmd):
@@ -12,9 +12,9 @@ class NetPol(ExtCmd):
         super(NetPol, self).__init__(config, central_node, worker_nodes)
         test_config = config.get(name, dict())
         self.config = NpCfg(
-            n_ns=test_config.get('n_ns', 0),
-            n_labels=test_config.get('n_labels', 0),
-            pods_ns_ratio=test_config.get('pods_ns_ratio', 0),
+            n_ns=test_config.get("n_ns", 0),
+            n_labels=test_config.get("n_labels", 0),
+            pods_ns_ratio=test_config.get("pods_ns_ratio", 0),
         )
         n_ports = self.config.pods_ns_ratio * self.config.n_ns
         if self.config.n_labels >= n_ports or self.config.n_labels <= 2:
@@ -26,7 +26,7 @@ class NetPol(ExtCmd):
         self.ports = []
 
     def init(self, ovn, global_cfg):
-        with Context(ovn, f'{self.name}_startup', brief_report=True) as _:
+        with Context(ovn, f"{self.name}_startup", brief_report=True) as _:
             self.ports = ovn.provision_ports(
                 self.config.pods_ns_ratio * self.config.n_ns
             )
@@ -36,7 +36,7 @@ class NetPol(ExtCmd):
                 ).append(self.ports[i])
 
             for i in range(self.config.n_ns):
-                ns = Namespace(ovn, f'NS_{self.name}_{i}', global_cfg)
+                ns = Namespace(ovn, f"NS_{self.name}_{i}", global_cfg)
                 ns.add_ports(
                     self.ports[
                         i
@@ -75,6 +75,6 @@ class NetPol(ExtCmd):
 
         if not global_cfg.cleanup:
             return
-        with Context(ovn, f'{self.name}_cleanup', brief_report=True) as ctx:
+        with Context(ovn, f"{self.name}_cleanup", brief_report=True) as ctx:
             for ns in self.all_ns:
                 ns.unprovision()

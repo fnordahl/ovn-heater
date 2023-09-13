@@ -5,12 +5,12 @@ from ovn_workload import Namespace
 from ovn_ext_cmd import ExtCmd
 
 
-NsRange = namedtuple('NsRange', ['start', 'n_pods'])
+NsRange = namedtuple("NsRange", ["start", "n_pods"])
 
 
 NsMultitenantCfg = namedtuple(
-    'NsMultitenantCfg',
-    ['n_namespaces', 'ranges', 'n_external_ips1', 'n_external_ips2'],
+    "NsMultitenantCfg",
+    ["n_namespaces", "ranges", "n_external_ips1", "n_external_ips2"],
 )
 
 
@@ -19,19 +19,19 @@ class NetpolMultitenant(ExtCmd):
         super(NetpolMultitenant, self).__init__(
             config, central_node, worker_nodes
         )
-        test_config = config.get('netpol_multitenant', dict())
+        test_config = config.get("netpol_multitenant", dict())
         ranges = [
             NsRange(
-                start=range_args.get('start', 0),
-                n_pods=range_args.get('n_pods', 5),
+                start=range_args.get("start", 0),
+                n_pods=range_args.get("n_pods", 5),
             )
-            for range_args in test_config.get('ranges', list())
+            for range_args in test_config.get("ranges", list())
         ]
         ranges.sort(key=lambda x: x.start, reverse=True)
         self.config = NsMultitenantCfg(
-            n_namespaces=test_config.get('n_namespaces', 0),
-            n_external_ips1=test_config.get('n_external_ips1', 3),
-            n_external_ips2=test_config.get('n_external_ips2', 20),
+            n_namespaces=test_config.get("n_namespaces", 0),
+            n_external_ips1=test_config.get("n_external_ips1", 3),
+            n_external_ips2=test_config.get("n_external_ips2", 20),
             ranges=ranges,
         )
 
@@ -64,33 +64,33 @@ class NetpolMultitenant(ExtCmd):
         """
         if global_cfg.run_ipv4:
             external_ips1 = [
-                netaddr.IPAddress('42.42.42.1') + i
+                netaddr.IPAddress("42.42.42.1") + i
                 for i in range(self.config.n_external_ips1)
             ]
             external_ips2 = [
-                netaddr.IPAddress('43.43.43.1') + i
+                netaddr.IPAddress("43.43.43.1") + i
                 for i in range(self.config.n_external_ips2)
             ]
         if global_cfg.run_ipv6:
             external6_ips1 = [
-                netaddr.IPAddress('42:42:42::1') + i
+                netaddr.IPAddress("42:42:42::1") + i
                 for i in range(self.config.n_external_ips1)
             ]
             external6_ips2 = [
-                netaddr.IPAddress('43:43:43::1') + i
+                netaddr.IPAddress("43:43:43::1") + i
                 for i in range(self.config.n_external_ips2)
             ]
 
         all_ns = []
         with Context(
-            ovn, 'netpol_multitenant', self.config.n_namespaces, test=self
+            ovn, "netpol_multitenant", self.config.n_namespaces, test=self
         ) as ctx:
             for i in ctx:
                 # Get the number of pods from the "highest" range that
                 # includes i.
                 ranges = self.config.ranges
                 n_ports = next((r.n_pods for r in ranges if i >= r.start), 1)
-                ns = Namespace(ovn, f'ns_netpol_multitenant_{i}', global_cfg)
+                ns = Namespace(ovn, f"ns_netpol_multitenant_{i}", global_cfg)
                 for _ in range(n_ports):
                     worker = ovn.select_worker_for_port()
                     for p in worker.provision_ports(ovn, 1):
@@ -115,7 +115,7 @@ class NetpolMultitenant(ExtCmd):
         if not global_cfg.cleanup:
             return
         with Context(
-            ovn, 'netpol_multitenant_cleanup', brief_report=True
+            ovn, "netpol_multitenant_cleanup", brief_report=True
         ) as ctx:
             for ns in all_ns:
                 ns.unprovision()
